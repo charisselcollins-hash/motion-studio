@@ -1,67 +1,55 @@
 # Motion Studio
 
-Motion graphics videos written as code. Each scene is a JavaScript file that draws one frame on a canvas for a given time `t`. A headless browser renders every frame and ffmpeg encodes them into an MP4.
+Motion graphics videos written as code. Each video is one HTML file. A headless browser (Playwright) draws every frame and ffmpeg joins the frames into an MP4.
 
-No npm install needed. It uses Node, Playwright (with Chromium) and ffmpeg.
+## Requirements
 
-## Commands
+- Node.js 18+
+- Playwright with Chromium: `npm i -D playwright && npx playwright install chromium`
+- ffmpeg with libx264 (e.g. `apt-get install -y ffmpeg` or `brew install ffmpeg`)
+
+## Usage
 
 ```bash
-npm run new my-scene             # create scenes/my-scene.js from the template
-npm run preview                  # live preview at http://localhost:3000
-npm run still -- my-scene 2.5    # PNG of the frame at 2.5s → out/stills/
-npm run render -- my-scene       # full video → out/my-scene.mp4
-npm run render:all               # render every scene
+node render.mjs videos/hello.html      # full video → out/hello.mp4 (30 fps)
+node render.mjs hello                  # same, looks in videos/
+node render.mjs hello --stills 3       # 3 evenly spaced PNGs → out/stills/
 ```
 
-Render options: `--from <sec>`, `--to <sec>`, `--crf <n>` (lower = higher quality, default 18), `--out <file>`.
+## Making a video
 
-In the preview, Space plays/pauses and ←/→ step one frame. Reload the page to see code changes.
+Create `videos/<name>.html`. It must:
 
-## Writing a scene
+1. Set `window.DURATION` (seconds) and `window.SIZE` (`[width, height]`).
+2. Define `window.render(t)`, which draws the exact frame at time `t` seconds.
+3. Link `../brand.css` to use your colors and fonts (`var(--color-primary)`, `var(--font-display)`, …).
 
-```js
-import { ease, progress, spring, text } from '../lib/motion.js';
-
-export default {
-  width: 1920, height: 1080, fps: 30, duration: 4,
-  background: '#0e0e12',
-  audio: 'assets/music.mp3',      // optional, muxed into the MP4
-
-  async setup() { /* optional: load images/fonts, return state */ },
-
-  render(ctx, t, { width, height, frame, duration, state }) {
-    const s = spring(t, 0.2);                       // springs in at 0.2s
-    text(ctx, 'Hello', width / 2, height / 2 + (1 - s) * 80, { size: 140 });
-  },
-};
+```html
+<link rel="stylesheet" href="../brand.css">
+<h1 id="title">Hi</h1>
+<script>
+  window.DURATION = 3;
+  window.SIZE = [1920, 1080];
+  window.render = (t) => {
+    const p = Math.min(1, t / 1);                 // 0→1 over the first second
+    title.style.opacity = p;
+    title.style.transform = `translateY(${(1 - p) * 50}px)`;
+  };
+</script>
 ```
 
-`render` must depend only on `t` (and `state` from setup). Never use `Math.random()` or the clock directly. Use `random(seed)` instead, so every render looks the same.
+Rules that keep every render identical:
 
-## Helpers in `lib/motion.js`
+- Everything on screen depends only on `t`.
+- No CSS animations or transitions (the renderer switches them off and warns), no `setTimeout`/`setInterval`/`requestAnimationFrame`, no `Date.now()`, no `Math.random()` (use a seeded random function if you need randomness).
 
-| Helper | What it does |
-| --- | --- |
-| `progress(t, start, dur, ease)` | 0→1 over a time window |
-| `interpolate(t, [in…], [out…], ease)` | map time to values, multi-keyframe |
-| `spring(t, start, {stiffness, damping})` | physical spring 0→1 with overshoot |
-| `inOut(t, start, end, fade)` | fade in, hold, fade out |
-| `stagger(i, each, start)` | start time for item `i` in a sequence |
-| `ease.*` | linear, quad, cubic, quart, expo, back, elastic, bounce, `bezier(...)` |
-| `text`, `circle`, `rect`, `group` | drawing shortcuts (`group` moves/rotates/scales/fades) |
-| `mixColor`, `withAlpha` | color blending |
-| `random(seed)`, `noise(x, seed)` | seeded randomness and smooth noise |
-| `loadImage`, `loadFont` | load files from `assets/` inside `setup()` |
+`videos/hello.html` is a working example with easing helpers you can copy.
 
-Anything else works too: the full Canvas 2D API (gradients, paths, clipping, filters, blend modes) is available on `ctx`.
-
-## Layout
+## Files
 
 ```
-scenes/     your videos, one file per scene
-lib/        motion.js helpers, player.html (preview + render page), template.js
-scripts/    render, preview, new-scene CLI
-assets/     images, fonts, audio
-out/        rendered MP4s (committed); out/stills/ is ignored
+brand.css      brand colors and fonts (CSS variables)
+render.mjs     the renderer
+videos/        one HTML file per video
+out/           rendered MP4s (committed); out/stills/ is not committed
 ```
