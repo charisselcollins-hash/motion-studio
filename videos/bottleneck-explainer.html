@@ -1,0 +1,263 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>What's slowing down your business? explainer</title>
+<link rel="stylesheet" href="../brand.css">
+<style>
+  /* Only the four brand colors are used, sometimes with transparency. */
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+  .layer { position: absolute; inset: 0; }
+  #glow {
+    position: absolute;
+    width: 1800px; height: 1800px;
+    left: 60px; top: -1050px;
+    border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in srgb, var(--color-muted) 22%, transparent), transparent 62%);
+  }
+
+  /* ---- Title ---- */
+  #title-wrap {
+    position: absolute;
+    left: 0; right: 0; top: 540px;
+    display: flex; flex-direction: column; align-items: center;
+    transform-origin: 50% 0;
+  }
+  #title {
+    margin: 0;
+    font-size: 116px;
+    line-height: 1.08;
+    letter-spacing: 1px;
+    text-align: center;
+  }
+  #title .line { display: block; white-space: nowrap; }
+  #title .word { display: inline-block; margin: 0 0.14em; }
+  #title .gold { color: var(--color-accent); }
+  #title-rule {
+    margin-top: 40px;
+    width: 520px; height: 6px; border-radius: 3px;
+    background: var(--color-accent);
+  }
+
+  /* ---- Steps ---- */
+  #track {
+    position: absolute;
+    left: 400px; width: 1120px; top: 382px; height: 4px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--color-muted) 25%, transparent);
+  }
+  #track-fill {
+    height: 100%; border-radius: 2px;
+    background: var(--color-accent);
+    transform-origin: left center;
+  }
+  .dot {
+    position: absolute; top: 370px;
+    width: 28px; height: 28px; margin-left: -14px;
+    border-radius: 50%;
+    background: var(--color-accent);
+  }
+  .step {
+    position: absolute; top: 432px;
+    width: 500px; margin-left: -250px;
+    text-align: center;
+  }
+  .step .num {
+    font-family: var(--font-display);
+    font-weight: var(--font-display-weight);
+    font-size: 150px; line-height: 1;
+    color: var(--color-accent);
+  }
+  .step h2 {
+    margin: 22px 0 0;
+    font-size: 46px; line-height: 1.12;
+    letter-spacing: 1px;
+    color: var(--color-text);
+  }
+  .step p {
+    margin: 22px auto 0;
+    max-width: 440px;
+    font-size: 30px; line-height: 1.4;
+    color: var(--color-muted);
+  }
+
+  /* ---- End card ---- */
+  #end {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  #wordmark {
+    margin: 0;
+    font-size: 170px; line-height: 1;
+    letter-spacing: 2px;
+    color: var(--color-accent);
+    white-space: nowrap;
+  }
+  #wordmark span { display: inline-block; }
+  #tagline {
+    margin-top: 30px;
+    font-family: var(--font-decorative);
+    font-weight: var(--font-decorative-weight);
+    font-size: 84px; line-height: 1;
+    color: var(--color-text);
+  }
+  #end-rule {
+    margin-top: 44px;
+    width: 360px; height: 5px; border-radius: 3px;
+    background: var(--color-accent);
+  }
+  #cta {
+    margin-top: 56px;
+    padding: 28px 60px;
+    border-radius: 999px;
+    background: var(--color-accent);
+    color: var(--color-bg);
+    font-family: var(--font-display);
+    font-weight: var(--font-display-weight);
+    font-size: 36px;
+    letter-spacing: 3px;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="glow"></div>
+
+  <div class="layer" id="steps-layer">
+    <div id="title-wrap">
+      <h1 id="title"></h1>
+      <div id="title-rule"></div>
+    </div>
+    <div id="track"><div id="track-fill"></div></div>
+    <div id="steps"></div>
+  </div>
+
+  <div class="layer" id="end">
+    <h1 id="wordmark"></h1>
+    <div id="tagline">Strategy Heart Execution</div>
+    <div id="end-rule"></div>
+    <div id="cta">TAKE THE BUSINESS BOTTLENECK ASSESSMENT</div>
+  </div>
+</div>
+
+<script>
+  window.DURATION = 15;
+  window.SIZE = [1920, 1080];
+
+  // ---- Copy (exactly as written in the brief) ----
+  const TITLE_LINES = [
+    [["WHAT'S"], ['SLOWING', 'gold'], ['DOWN', 'gold']],
+    [['YOUR'], ['BUSINESS?']],
+  ];
+  const STEPS = [
+    { num: '01', head: 'IDENTIFY THE BOTTLENECK', line: "discover what's slowing down your business", at: 4.0 },
+    { num: '02', head: 'FIND SMARTER SOLUTIONS', line: 'Explore opportunities for automation and better workflows.', at: 6.0 },
+    { num: '03', head: 'TAKE BACK YOUR TIME', line: 'Focus on growing your business, not managing repetitive tasks', at: 8.0 },
+  ];
+  const STEP_X = [400, 960, 1520]; // column centers
+
+  // ---- Helpers (plain math, no timers) ----
+  const clamp = (x) => Math.min(1, Math.max(0, x));
+  const lerp = (a, b, p) => a + (b - a) * p;
+  const easeOutCubic = (x) => 1 - (1 - x) ** 3;
+  const easeInOutCubic = (x) => (x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2);
+  const easeOutBack = (x) => 1 + 2.2 * (x - 1) ** 3 + 1.2 * (x - 1) ** 2;
+  const progress = (t, start, dur, ease = (x) => x) => ease(clamp((t - start) / dur));
+  const $ = (id) => document.getElementById(id);
+
+  // ---- Build elements ----
+  const titleWords = [];
+  for (const line of TITLE_LINES) {
+    const l = document.createElement('span');
+    l.className = 'line';
+    for (const [word, cls] of line) {
+      const w = document.createElement('span');
+      w.className = 'word' + (cls ? ' ' + cls : '');
+      w.textContent = word;
+      l.appendChild(w);
+      titleWords.push(w);
+    }
+    $('title').appendChild(l);
+  }
+
+  const steps = STEPS.map((s, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'dot';
+    dot.style.left = `${STEP_X[i]}px`;
+    const el = document.createElement('div');
+    el.className = 'step';
+    el.style.left = `${STEP_X[i]}px`;
+    el.innerHTML = `<div class="num">${s.num}</div><h2>${s.head}</h2><p>${s.line}</p>`;
+    $('steps').append(dot, el);
+    return { ...s, dot, num: el.querySelector('.num'), head: el.querySelector('h2'), line: el.querySelector('p') };
+  });
+
+  const letters = [...'S.H.E. BUILDS'].map((c) => {
+    const s = document.createElement('span');
+    s.textContent = c === ' ' ? ' ' : c;
+    $('wordmark').appendChild(s);
+    return s;
+  });
+
+  const show = (el, opacity, x = 0, y = 0, scale = 1) => {
+    el.style.opacity = clamp(opacity);
+    el.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+  };
+
+  // Title block starts centered on screen; measure its height once fonts are in.
+  let titleHeight = 0;
+  const measure = () => { titleHeight = $('title-wrap').offsetHeight; };
+
+  // ---- Draw the frame at time t ----
+  window.render = function (t) {
+    measure(); // cheap, and correct once fonts have loaded
+
+    // Background glow
+    $('glow').style.opacity = progress(t, 0, 1.0, easeOutCubic);
+    $('glow').style.transform = `translateX(${Math.sin(t * 0.5) * 80}px)`;
+
+    // Scene 1: title words rise in, gold rule draws.
+    titleWords.forEach((w, i) => {
+      const start = 0.3 + i * 0.18;
+      show(w, progress(t, start, 0.35), 0, (1 - progress(t, start, 0.7, easeOutBack)) * 70);
+    });
+    $('title-rule').style.transform = `scaleX(${progress(t, 1.4, 0.8, easeInOutCubic)})`;
+
+    // 3.2–4.0s: title shrinks and glides up to become a header.
+    const move = progress(t, 3.2, 0.8, easeInOutCubic);
+    const scale = lerp(1, 0.42, move);
+    const top = lerp(540 - titleHeight / 2, 90, move);
+    $('title-wrap').style.transform = `translateY(${top - 540}px) scale(${scale})`;
+
+    // Steps appear one at a time; the gold track grows from dot to dot.
+    steps.forEach((s, i) => {
+      show(s.dot, progress(t, s.at, 0.3), 0, 0, progress(t, s.at, 0.6, easeOutBack));
+      show(s.num, progress(t, s.at + 0.05, 0.4), 0, 0, lerp(0.6, 1, progress(t, s.at + 0.05, 0.8, easeOutBack)));
+      show(s.head, progress(t, s.at + 0.25, 0.4), 0, (1 - progress(t, s.at + 0.25, 0.7, easeOutCubic)) * 40);
+      show(s.line, progress(t, s.at + 0.55, 0.6, easeOutCubic), 0, (1 - progress(t, s.at + 0.55, 0.7, easeOutCubic)) * 20);
+    });
+    const trackIn = progress(t, 3.8, 0.5, easeOutCubic);
+    $('track').style.opacity = trackIn;
+    const fill = 0.5 * progress(t, 6.0, 0.9, easeInOutCubic) + 0.5 * progress(t, 8.0, 0.9, easeInOutCubic);
+    $('track-fill').style.transform = `scaleX(${fill})`;
+
+    // 11.0–12.0s: steps and header drift up and fade.
+    const out = progress(t, 11.0, 0.7, easeInOutCubic);
+    show($('steps-layer'), 1 - out, 0, -70 * out);
+
+    // Scene 5: end card.
+    letters.forEach((el, i) => {
+      const start = 11.6 + i * 0.04;
+      // Gentle wave across the letters after everything is in (no new colors).
+      const wave = Math.max(0, 1 - Math.abs(i - (-2 + progress(t, 13.9, 0.9, easeInOutCubic) * (letters.length + 4))) / 2);
+      show(el, progress(t, start, 0.3), 0, (1 - progress(t, start, 0.7, easeOutBack)) * 80 - wave * 14);
+    });
+    show($('tagline'), progress(t, 12.3, 0.7, easeOutCubic), 0, (1 - progress(t, 12.3, 0.8, easeOutCubic)) * 30);
+    $('end-rule').style.transform = `scaleX(${progress(t, 12.8, 0.7, easeInOutCubic)})`;
+    const cta = progress(t, 13.2, 0.7, easeOutBack);
+    show($('cta'), progress(t, 13.2, 0.35), 0, (1 - cta) * 30, lerp(0.85, 1, cta));
+  };
+
+  window.render(0);
+</script>
+</body>
+</html>
