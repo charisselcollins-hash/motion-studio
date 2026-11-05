@@ -63,7 +63,14 @@ try {
   page.on('requestfailed', (r) => errors.push(`Could not load ${r.url()}`));
 
   await page.goto(pathToFileURL(file).href, { waitUntil: 'load' });
-  await page.evaluate(() => document.fonts.ready);
+  // Load every declared font up front, including ones that only appear later in the video.
+  const badFonts = await page.evaluate(async () => {
+    const faces = [...document.fonts];
+    await Promise.allSettled(faces.map((f) => f.load()));
+    await document.fonts.ready;
+    return faces.filter((f) => f.status === 'error').map((f) => `${f.family} ${f.weight}`);
+  });
+  if (badFonts.length) errors.push(`Fonts failed to load: ${badFonts.join(', ')}`);
   if (errors.length) throw new Error(`The video page has errors:\n  ${errors.join('\n  ')}`);
 
   const { duration, size, hasRender, animations } = await page.evaluate(() => ({

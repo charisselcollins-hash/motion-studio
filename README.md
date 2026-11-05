@@ -49,6 +49,7 @@ Rules that keep every render identical:
 
 ```
 brand.css      brand colors and fonts (CSS variables)
+fonts/         font files used by brand.css (offline rendering)
 render.mjs     the renderer
 videos/        one HTML file per video
 out/           rendered MP4s (committed); out/stills/ is not committed
