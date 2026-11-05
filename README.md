@@ -52,5 +52,6 @@ brand.css      brand colors and fonts (CSS variables)
 fonts/         font files used by brand.css (offline rendering)
 render.mjs     the renderer
 videos/        one HTML file per video
+templates/     reusable video briefs with [brackets] to fill in
 out/           rendered MP4s (committed); out/stills/ is not committed
 ```
