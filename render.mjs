@@ -26,17 +26,23 @@ function fail(msg) {
 const args = process.argv.slice(2);
 let input = null;
 let stills = null;
+let stillTimes = null;
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--stills') {
     stills = Number(args[++i] ?? 3);
     if (!Number.isInteger(stills) || stills < 1) fail('--stills needs a whole number, e.g. --stills 3');
+  } else if (args[i] === '--at') {
+    // Stills at chosen times in seconds, e.g. --at 2.5,10.5,14.9
+    stillTimes = String(args[++i] ?? '').split(',').map(Number);
+    if (!stillTimes.length || stillTimes.some((n) => Number.isNaN(n) || n < 0)) fail('--at needs times in seconds, e.g. --at 2.5,10.5,14.9');
+    stills = stillTimes.length;
   } else if (!input) {
     input = args[i];
   } else {
     fail(`Unexpected argument: ${args[i]}`);
   }
 }
-if (!input) fail('Usage: node render.mjs <video.html | name> [--stills N]');
+if (!input) fail('Usage: node render.mjs <video.html | name> [--stills N | --at 1.5,4,9]');
 
 const candidates = [input, path.join(ROOT, 'videos', input), path.join(ROOT, 'videos', `${input}.html`)];
 const file = candidates.map((p) => path.resolve(p)).find((p) => fs.existsSync(p) && fs.statSync(p).isFile());
@@ -73,12 +79,15 @@ try {
   if (badFonts.length) errors.push(`Fonts failed to load: ${badFonts.join(', ')}`);
   if (errors.length) throw new Error(`The video page has errors:\n  ${errors.join('\n  ')}`);
 
-  const { duration, size, hasRender, animations } = await page.evaluate(() => ({
+  const { duration, size, hasRender, animations, audio } = await page.evaluate(() => ({
     duration: window.DURATION,
     size: window.SIZE,
     hasRender: typeof window.render === 'function',
     animations: document.getAnimations().length,
+    audio: window.AUDIO ?? null, // optional music file, relative to the video's HTML file
   }));
+  const audioFile = audio ? path.resolve(path.dirname(file), audio) : null;
+  if (audioFile && !fs.existsSync(audioFile)) throw new Error(`window.AUDIO file not found: ${audio}`);
   if (!(typeof duration === 'number' && duration > 0)) throw new Error('window.DURATION must be a number of seconds, e.g. 3');
   if (!(Array.isArray(size) && size.length === 2 && size.every((n) => Number.isInteger(n) && n > 0))) {
     throw new Error('window.SIZE must be [width, height], e.g. [1920, 1080]');
@@ -103,8 +112,9 @@ try {
     const dir = path.join(OUT, 'stills');
     fs.mkdirSync(dir, { recursive: true });
     for (let i = 0; i < stills; i++) {
-      // Evenly spaced through the video, e.g. 3 stills of a 3s video → 0.5s, 1.5s, 2.5s.
-      const frame = Math.min(totalFrames - 1, Math.round(((i + 0.5) / stills) * duration * FPS));
+      // Chosen times (--at), or evenly spaced, e.g. 3 stills of a 3s video → 0.5s, 1.5s, 2.5s.
+      const time = stillTimes ? stillTimes[i] : ((i + 0.5) / stills) * duration;
+      const frame = Math.min(totalFrames - 1, Math.round(time * FPS));
       const png = await capture(frame);
       const out = path.join(dir, `${name}-${(frame / FPS).toFixed(2)}s.png`);
       fs.writeFileSync(out, png);
@@ -117,6 +127,7 @@ try {
     const ffmpeg = spawn('ffmpeg', [
       '-y', '-loglevel', 'error',
       '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'png', '-i', '-',
+      ...(audioFile ? ['-i', audioFile, '-map', '0:v', '-map', '1:a', '-c:a', 'aac', '-b:a', '192k', '-t', String(totalFrames / FPS)] : []),
       '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2', // H.264 needs even dimensions
       '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p',
       '-movflags', '+faststart', out,
@@ -137,7 +148,8 @@ try {
     if (process.stdout.isTTY) process.stdout.write('\n');
     const mb = (fs.statSync(out).size / 1e6).toFixed(2);
     const secs = ((Date.now() - started) / 1000).toFixed(1);
-    console.log(`Video → ${path.relative(ROOT, out)} (${totalFrames} frames, ${width}x${height}, ${mb} MB, ${secs}s)`);
+    const sound = audioFile ? `, music: ${path.relative(ROOT, audioFile)}` : '';
+    console.log(`Video → ${path.relative(ROOT, out)} (${totalFrames} frames, ${width}x${height}, ${mb} MB, ${secs}s${sound})`);
   }
 } catch (e) {
   console.error(e.message);
